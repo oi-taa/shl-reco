@@ -18,22 +18,26 @@ logger = logging.getLogger(__name__)
 
 class SHLRecommendationEngine:
     def __init__(self, collection_name="shl_assessments", model_name="all-MiniLM-L6-v2", 
-             host="localhost", port="19530", llm_api_key=None, llm_model="gemini-pro"):
+             host="localhost", port="19530", llm_api_key=None, llm_model="gemini-pro",
+             zilliz_uri=None, zilliz_user=None, zilliz_password=None, zilliz_secure=True):
         """
         Initialize the SHL Assessment Recommendation Engine
         """
-        self._connect_to_milvus(host, port)
+        # Connect to Milvus/Zilliz Cloud
+        if zilliz_uri:
+            self._connect_to_zilliz(zilliz_uri, zilliz_user, zilliz_password, zilliz_secure)
+        else:
+            self._connect_to_milvus(host, port)
         
-    
         logger.info(f"Loading embedding model: {model_name}")
         self.model = SentenceTransformer(model_name)
         
         logger.info(f"Loading collection: {collection_name}")
         self.collection = Collection(name=collection_name)
         self.collection.load()
-   
+
         self.collection_name = collection_name
-     
+        
         self.llm_api_key = llm_api_key
         self.llm_model = llm_model
         
@@ -48,15 +52,41 @@ class SHLRecommendationEngine:
                 logger.error(f"Failed to initialize Gemini client: {str(e)}")
         
         logger.info("Recommendation engine initialized")
-    
+
     def _connect_to_milvus(self, host, port):
-        """Connect to Milvus server"""
+        """Connect to local Milvus server"""
         try:
-            logger.info(f"Connecting to Milvus at {host}:{port}")
+            # Always disconnect first to avoid connection conflicts
+            if connections.has_connection("default"):
+                connections.disconnect("default")
+                logger.info("Disconnected existing connection")
+                
+            logger.info(f"Connecting to local Milvus at {host}:{port}")
             connections.connect("default", host=host, port=port)
-            logger.info("Connected to Milvus")
+            logger.info("Connected to local Milvus")
         except Exception as e:
             logger.error(f"Failed to connect to Milvus: {str(e)}")
+            raise
+
+    def _connect_to_zilliz(self, uri, user, password, secure=True):
+        """Connect to Zilliz Cloud"""
+        try:
+            # Always disconnect first to avoid connection conflicts
+            if connections.has_connection("default"):
+                connections.disconnect("default")
+                logger.info("Disconnected existing connection")
+                
+            logger.info(f"Connecting to Zilliz Cloud at {uri}")
+            connections.connect(
+                "default", 
+                uri=uri,
+                user=user,
+                password=password,
+                secure=secure
+            )
+            logger.info("Connected to Zilliz Cloud")
+        except Exception as e:
+            logger.error(f"Failed to connect to Zilliz Cloud: {str(e)}")
             raise
     
     def extract_parameters_with_llm(self, query: str) -> Dict[str, Any]:

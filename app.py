@@ -2,20 +2,25 @@ import streamlit as st
 import requests
 import json
 import pandas as pd
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file (for local development)
+load_dotenv()
 
 st.set_page_config(
     page_title="SHL Assessment Recommender",
     page_icon="🧪",
     layout="wide"
 )
-
 st.title("SHL Assessment Recommendation System")
 st.markdown("""
 This system helps hiring managers find the right assessments for their job roles.
 Enter a job description, natural language query, or job posting URL below.
 """)
 
-API_ENDPOINT = "https://shl-assessment-reco-21953.streamlit.app"
+# Get API endpoint from environment or use default
+API_ENDPOINT = os.getenv("API_ENDPOINT", "https://your-fastapi-endpoint.com/recommend")
 
 input_type = st.radio(
     "Select input type:",
@@ -61,12 +66,13 @@ def get_recommendations(query, top_k):
             "top_k": top_k
         }
         
-        response = requests.post(API_ENDPOINT, json=payload)
+        response = requests.post(f"{API_ENDPOINT}", json=payload)
    
         if response.status_code == 200:
             return response.json()
         else:
             st.error(f"Error: API returned status code {response.status_code}")
+            st.error(f"Response: {response.text}")
             return None
     except Exception as e:
         st.error(f"Error connecting to the API: {str(e)}")
