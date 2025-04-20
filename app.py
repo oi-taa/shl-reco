@@ -20,7 +20,7 @@ Enter a job description, natural language query, or job posting URL below.
 """)
 
 # Get API endpoint from environment or use default
-API_ENDPOINT = os.getenv("API_ENDPOINT", "https://your-fastapi-endpoint.com/recommend")
+API_ENDPOINT = os.getenv("API_ENDPOINT", "https://shl-reco.onrender.com/recommend")
 
 input_type = st.radio(
     "Select input type:",
@@ -66,7 +66,7 @@ def get_recommendations(query, top_k):
             "top_k": top_k
         }
         
-        response = requests.post(f"{API_ENDPOINT}", json=payload)
+        response = requests.post(API_ENDPOINT, json=payload)
    
         if response.status_code == 200:
             return response.json()
