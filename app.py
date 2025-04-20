@@ -18,7 +18,7 @@ Enter a job description, natural language query, or job posting URL below.
 """)
 
 # API endpoint - replace with your actual API endpoint when deployed
-API_ENDPOINT = "http://localhost:8001/recommend"
+API_ENDPOINT = "https://shl-assessment-reco-21953.streamlit.app"
 
 # Input section
 input_type = st.radio(
