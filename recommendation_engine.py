@@ -606,7 +606,7 @@ class SHLRecommendationEngine:
             if ranking and isinstance(ranking, list):
                 if len(ranking) > 0 and isinstance(ranking[0], list):
                     logger.info("Detected nested array in LLM response, flattening")
-                    ranking = ranking[0] t
+                    ranking = ranking[0] 
 
                 valid_rankings = []
                 for item in ranking:
