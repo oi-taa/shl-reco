@@ -77,7 +77,7 @@ app.add_middleware(
 # Define request and response models
 class Query(BaseModel):
     query: str
-    top_k: int = Field(default=5, ge=1, le=10, description="Number of recommendations to retrieve (1-10)")
+    top_k: int = Field(default=7, ge=1, le=10, description="Number of recommendations to retrieve (1-10)")
 class AssessmentType(BaseModel):
     url: str
     adaptive_support: str
