@@ -13,14 +13,6 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 # Initialize the app
-app = FastAPI(title="SHL Assessment Recommendation API")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 # Zilliz Cloud connection parameters - read from environment with no defaults for sensitive data
 ZILLIZ_URI = os.getenv("ZILLIZ_URI")
 ZILLIZ_USER = os.getenv("ZILLIZ_USER")
@@ -32,29 +24,56 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 
 recommendation_engine = None
-@app.on_event("startup")
-async def startup_event():
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global recommendation_engine
     try:
         logger.info("Initializing SHL Recommendation Engine...")
-        
-        # Check if we have the required Zilliz credentials
-        if all([ZILLIZ_URI, ZILLIZ_USER, ZILLIZ_PASSWORD]):
-            logger.info("Using Zilliz Cloud for vector database")
-            recommendation_engine = SHLRecommendationEngine(
-                collection_name=COLLECTION_NAME,
-                llm_api_key=GEMINI_API_KEY,
-                llm_model=GEMINI_MODEL,
-                zilliz_uri=ZILLIZ_URI,
-                zilliz_user=ZILLIZ_USER,
-                zilliz_password=ZILLIZ_PASSWORD,
-                zilliz_secure=ZILLIZ_SECURE
-            )
-            
+
+        logger.info(f"ZILLIZ_URI: {ZILLIZ_URI}")
+        logger.info(f"ZILLIZ_USER: {ZILLIZ_USER}")
+        logger.info(f"ZILLIZ_PASSWORD: {'******' if ZILLIZ_PASSWORD else None}")
+        logger.info(f"GEMINI_API_KEY: {'******' if GEMINI_API_KEY else None}")
+
+        missing = [k for k, v in {
+            "ZILLIZ_URI": ZILLIZ_URI,
+            "ZILLIZ_USER": ZILLIZ_USER,
+            "ZILLIZ_PASSWORD": ZILLIZ_PASSWORD,
+            "GEMINI_API_KEY": GEMINI_API_KEY
+        }.items() if not v]
+        if missing:
+            raise RuntimeError(f"Missing environment variables: {missing}")
+
+        recommendation_engine = SHLRecommendationEngine(
+            collection_name=COLLECTION_NAME,
+            llm_api_key=GEMINI_API_KEY,
+            llm_model=GEMINI_MODEL,
+            zilliz_uri=ZILLIZ_URI,
+            zilliz_user=ZILLIZ_USER,
+            zilliz_password=ZILLIZ_PASSWORD,
+            zilliz_secure=ZILLIZ_SECURE
+        )
+
         logger.info("SHL Recommendation Engine initialized successfully.")
+
     except Exception as e:
         logger.error(f"Failed to initialize recommendation engine: {str(e)}")
         raise
+
+    yield  # App runs here
+
+app = FastAPI(title="SHL Assessment Recommendation API", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 # Define request and response models
 class Query(BaseModel):
     query: str
@@ -77,6 +96,7 @@ async def health_check():
 @app.post("/recommend", response_model=RecommendationResponse)
 async def recommend(query: Query):
     """Get assessment recommendations based on query"""
+    
     if not recommendation_engine:
         raise HTTPException(status_code=500, detail="Recommendation engine not initialized")
    
