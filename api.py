@@ -117,5 +117,5 @@ async def recommend(query: Query):
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8001))
+    port = int(os.getenv("PORT", 10000))
     uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True)
