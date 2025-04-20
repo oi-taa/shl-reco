@@ -26,8 +26,6 @@ class SHLRecommendationEngine:
         # Connect to Milvus/Zilliz Cloud
         if zilliz_uri:
             self._connect_to_zilliz(zilliz_uri, zilliz_user, zilliz_password, zilliz_secure)
-        else:
-            self._connect_to_milvus(host, port)
         
         logger.info(f"Loading embedding model: {model_name}")
         self.model = SentenceTransformer(model_name)
@@ -53,20 +51,7 @@ class SHLRecommendationEngine:
         
         logger.info("Recommendation engine initialized")
 
-    def _connect_to_milvus(self, host, port):
-        """Connect to local Milvus server"""
-        try:
-            # Always disconnect first to avoid connection conflicts
-            if connections.has_connection("default"):
-                connections.disconnect("default")
-                logger.info("Disconnected existing connection")
-                
-            logger.info(f"Connecting to local Milvus at {host}:{port}")
-            connections.connect("default", host=host, port=port)
-            logger.info("Connected to local Milvus")
-        except Exception as e:
-            logger.error(f"Failed to connect to Milvus: {str(e)}")
-            raise
+    
 
     def _connect_to_zilliz(self, uri, user, password, secure=True):
         """Connect to Zilliz Cloud"""

@@ -6,8 +6,10 @@ from eval import EvaluationMetrics
 from recommendation_engine import SHLRecommendationEngine
 from dotenv import load_dotenv
 
-MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
-MILVUS_PORT = os.getenv("MILVUS_PORT", "19530")
+ZILLIZ_URI = os.getenv("ZILLIZ_URI")
+ZILLIZ_USER = os.getenv("ZILLIZ_USER")
+ZILLIZ_PASSWORD = os.getenv("ZILLIZ_PASSWORD")
+ZILLIZ_SECURE = os.getenv("ZILLIZ_SECURE", "True").lower() == "true"
 COLLECTION_NAME = os.getenv("MILVUS_COLLECTION", "shl_assessments")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
@@ -76,15 +78,15 @@ def run_evaluation(engine, ground_truth, k_values=[1, 3, 5, 10]):
 
 
 if __name__ == "__main__":
-    # Initialize the recommendation engine
-    # Replace these with your actual Milvus connection details and API key
-    engine = SHLRecommendationEngine(
-            collection_name=COLLECTION_NAME,
-            host=MILVUS_HOST,
-            port=MILVUS_PORT,
-            llm_api_key=GEMINI_API_KEY,
-            llm_model=GEMINI_MODEL
-        )
+    engine = recommendation_engine = SHLRecommendationEngine(
+                collection_name=COLLECTION_NAME,
+                llm_api_key=GEMINI_API_KEY,
+                llm_model=GEMINI_MODEL,
+                zilliz_uri=ZILLIZ_URI,
+                zilliz_user=ZILLIZ_USER,
+                zilliz_password=ZILLIZ_PASSWORD,
+                zilliz_secure=ZILLIZ_SECURE
+            )
     
     # Load ground truth from eval_check.json
     ground_truth = extract_ground_truth_from_file('eval_check.json')

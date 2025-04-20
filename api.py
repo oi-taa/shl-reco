@@ -30,9 +30,6 @@ COLLECTION_NAME = os.getenv("MILVUS_COLLECTION", "shl_assessments")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
-# Fallback for local development
-MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
-MILVUS_PORT = os.getenv("MILVUS_PORT", "19530")
 
 recommendation_engine = None
 @app.on_event("startup")
@@ -52,15 +49,6 @@ async def startup_event():
                 zilliz_user=ZILLIZ_USER,
                 zilliz_password=ZILLIZ_PASSWORD,
                 zilliz_secure=ZILLIZ_SECURE
-            )
-        else:
-            logger.warning("Zilliz Cloud credentials not found, falling back to local Milvus")
-            recommendation_engine = SHLRecommendationEngine(
-                collection_name=COLLECTION_NAME,
-                host=MILVUS_HOST,
-                port=MILVUS_PORT,
-                llm_api_key=GEMINI_API_KEY,
-                llm_model=GEMINI_MODEL
             )
             
         logger.info("SHL Recommendation Engine initialized successfully.")
