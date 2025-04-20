@@ -8,43 +8,36 @@ from typing import Dict, List, Optional, Union, Any
 from google import genai
 from eval import EvaluationMetrics
 
-# Import Google's Generative AI client
 try:
     from google import genai
 except ImportError:
     logging.warning("Google genai package not installed. LLM features will be limited.")
 
-# Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class SHLRecommendationEngine:
-    # Modified __init__ method
     def __init__(self, collection_name="shl_assessments", model_name="all-MiniLM-L6-v2", 
              host="localhost", port="19530", llm_api_key=None, llm_model="gemini-pro"):
         """
         Initialize the SHL Assessment Recommendation Engine
         """
-        # Connect to Milvus
         self._connect_to_milvus(host, port)
         
-        # Load the embedding model
+    
         logger.info(f"Loading embedding model: {model_name}")
         self.model = SentenceTransformer(model_name)
         
-        # Load the collection
         logger.info(f"Loading collection: {collection_name}")
         self.collection = Collection(name=collection_name)
         self.collection.load()
-        
-        # Cache some frequently used values for faster processing
+   
         self.collection_name = collection_name
-        
-        # Set up LLM API credentials
+     
         self.llm_api_key = llm_api_key
         self.llm_model = llm_model
         
-        # Create a client instance if possible
+        # Create a client instance
         self.genai_client = None
         if llm_api_key and 'genai' in globals():
             try:
@@ -81,7 +74,7 @@ class SHLRecommendationEngine:
         """
         if not self.llm_api_key or 'genai' not in globals():
             logger.warning("LLM API credentials not provided or genai not available, falling back to basic extraction")
-            # Fallback to basic extraction
+            # Fallback 
             return {
                 "skills": self._basic_extract_skills(query),
                 "time_limit": self._basic_extract_time_constraints(query),
@@ -93,7 +86,6 @@ class SHLRecommendationEngine:
             }
         
         try:
-            # Prepare prompt for the LLM
             prompt = f"""
             You are an expert HR assessment analyst. Extract structured information from this job description or query.
             Focus on identifying the right balance of broad skill categories and specific technical skills when relevant.
@@ -142,8 +134,7 @@ class SHLRecommendationEngine:
             
             Query: {query}
             """
-                        
-            # Call LLM API
+
             response = self._call_llm_api(prompt)
             logger.debug(f"Processed LLM response: {response[:100]}...")
             print("response:",  response)
@@ -152,11 +143,9 @@ class SHLRecommendationEngine:
             if not response:
                 raise ValueError("Empty response from LLM")
             
-            # Try to parse the JSON response with additional error handling
             try:
                 extracted_params = json.loads(response)
             except json.JSONDecodeError as e:
-                # Try to clean up common JSON formatting issues
                 # 1. Fix single quotes instead of double quotes
                 fixed_response = response.replace("'", "\"")
                 # 2. Fix unquoted keys
@@ -172,7 +161,6 @@ class SHLRecommendationEngine:
             
             logger.info(f"LLM extracted parameters: {extracted_params}")
             
-            # Validate and ensure all expected keys are present
             expected_keys = ["skills", "time_limit", "remote_testing", "adaptive_testing", 
                              "test_types", "seniority_level", "core_query"]
             for key in expected_keys:
@@ -192,7 +180,7 @@ class SHLRecommendationEngine:
             logger.error(f"Error in LLM parameter extraction: {str(e)}")
             logger.warning("Falling back to basic extraction")
             
-            # Fallback to basic extraction
+            # Fallback
             return {
                 "skills": self._basic_extract_skills(query),
                 "time_limit": self._basic_extract_time_constraints(query),
@@ -221,7 +209,6 @@ class SHLRecommendationEngine:
             from google import genai
             from google.genai import types
             
-            # Use the client to generate content
             response = self.genai_client.models.generate_content(
                 model=self.llm_model,
                 contents=prompt,
@@ -236,24 +223,20 @@ class SHLRecommendationEngine:
             if hasattr(response, 'text'):
                 raw_text = response.text
             else:
-                # Try to extract text from the response
                 raw_text = str(response)
             
             logger.debug(f"Raw LLM response: {raw_text[:100]}...")
             
-            # Look for JSON content in the response - it might be wrapped in ```json blocks
+            # To parse response returned in '''
             import re
             json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', raw_text)
             if json_match:
-                # Extract just the JSON part from code blocks
                 return json_match.group(1).strip()
             
-            # If no code blocks found, try to find anything that looks like JSON
             json_match = re.search(r'(\{[\s\S]*\})', raw_text)
             if json_match:
                 return json_match.group(1).strip()
                 
-            # Return raw text as a last resort
             return raw_text
                 
         except Exception as e:
@@ -273,17 +256,14 @@ class SHLRecommendationEngine:
             return None
         
         try:
-            # First try: direct JSON parsing
             return json.loads(text)
         except json.JSONDecodeError:
-            # Second try: clean up text by removing # characters
             cleaned_text = text.replace('#', '')
             try:
                 return json.loads(cleaned_text)
             except json.JSONDecodeError:
                 pass
-            
-            # Third try: look for JSON in code blocks
+     
             import re
             json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
             if json_match:
@@ -292,8 +272,7 @@ class SHLRecommendationEngine:
                     return json.loads(cleaned_content)
                 except json.JSONDecodeError:
                     pass
-            
-            # Fourth try: find anything that looks like JSON
+
             json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', text)
             if json_match:
                 try:
@@ -301,20 +280,17 @@ class SHLRecommendationEngine:
                     return json.loads(cleaned_content)
                 except json.JSONDecodeError:
                     pass
-            
-            # Fifth try: extract numbers using regex
+          
             number_pattern = r'#?(\d+)'
             matches = re.findall(number_pattern, text)
             if matches:
-                # Extract just the numbers
                 extracted_numbers = [int(num) for num in matches]
                 if extracted_numbers:
                     return extracted_numbers
             
-            # If all attempts fail, return None
             logger.warning(f"Failed to extract JSON from response: {text[:100]}...")
             return None
-    # Keep the basic extraction methods as fallbacks
+    # fallbacks
     def _basic_extract_time_constraints(self, query):
         """Extract time constraints from the query using regex"""
         import re
@@ -343,12 +319,11 @@ class SHLRecommendationEngine:
     
     def get_query_embedding(self, query):
         """Convert query to embedding vector using the same model as indexing"""
-        # Handle potential batching by ensuring we have a single item
         if isinstance(query, list):
             embeddings = self.model.encode(query)
             return embeddings
         else:
-            embedding = self.model.encode([query])[0]  # Get first item from batch
+            embedding = self.model.encode([query])[0]  
             return embedding
     
     def search_similar_assessments(self, query_vector, params=None, top_k=10):
@@ -363,8 +338,8 @@ class SHLRecommendationEngine:
         start_time = time.time()
         
         search_params = {
-            "metric_type": "COSINE",  # Use cosine similarity
-            "params": {"ef": 100}     # Higher ef value improves recall but increases search time
+            "metric_type": "COSINE", 
+            "params": {"ef": 100}  
         }
 
         
@@ -377,7 +352,7 @@ class SHLRecommendationEngine:
             data=[query_vector.tolist()],
             anns_field="embedding",
             param=search_params,
-            limit=top_k * 2,  # Get more results for filtering
+            limit=top_k * 2, 
             output_fields=output_fields
         )
         
@@ -390,10 +365,8 @@ class SHLRecommendationEngine:
         """Format Milvus search results into assessment recommendations"""
         recommendations = []
         
-        # Process each hit
         for hit in results[0]:
             try:
-                # Access fields directly as attributes
                 fields = {}
                 for field in ["name", "url", "description", "duration", 
                              "remote_support", "adaptive_support", "test_type_json"]:
@@ -418,8 +391,7 @@ class SHLRecommendationEngine:
                 recommendations.append(recommendation)
             except Exception as e:
                 logger.error(f"Error processing hit: {str(e)}")
-        
-        # Return all recommendations after processing all hits
+
         return recommendations
     
     def filter_by_constraints(self, recommendations, params):
@@ -466,15 +438,14 @@ class SHLRecommendationEngine:
             dict: Dictionary with recommended assessments and similarity scores
         """
         logger.info(f"Processing query: {query[:50]}{'...' if len(query) > 50 else ''}")
-        
-        # Extract parameters using LLM
+    
         params = self.extract_parameters_with_llm(query)
         logger.info(f"Extracted parameters: {params}")
         
         # Original query embedding
         query_vector = self.get_query_embedding(query)
         
-        # Generate structured description-based embedding if possible
+        # structured description-based embedding 
         if params and "skills" in params:
             # Get test types and skills from params
             test_types = params.get("test_types", [])
@@ -483,47 +454,37 @@ class SHLRecommendationEngine:
             # Format structured text similar to how we created the original embeddings
             structured_text = f"Assessment for {params.get('seniority_level', '')} with skills {', '.join(skills)} "
             
-            # Create embedding for the structured text
             desc_vector = self.get_query_embedding(structured_text)
             logger.info("Generated structured description embedding for matching")
             
-            # Search using the structured description embedding
             desc_search_results = self.search_similar_assessments(desc_vector, params, top_k=top_k*3)
             desc_recommendations = self.format_search_results(desc_search_results)
-            
-            # Compare with regular search
+  
             regular_search_results = self.search_similar_assessments(query_vector, params, top_k=top_k*3)
             regular_recommendations = self.format_search_results(regular_search_results)
-            
-            # Log comparison info
+         
             logger.info(f"Description-based search returned {len(desc_recommendations)} results")
             logger.info(f"Regular search returned {len(regular_recommendations)} results")
             
-            # Optional: Calculate overlap between the two result sets
             desc_urls = set(r['url'] for r in desc_recommendations)
             regular_urls = set(r['url'] for r in regular_recommendations)
             overlap = desc_urls.intersection(regular_urls)
             logger.info(f"Overlap between search methods: {len(overlap)}/{min(len(desc_urls), len(regular_urls))}")
             
-            # Choose which recommendations to use (could be a parameter)
             recommendations = desc_recommendations
             search_method = "description_based"
         else:
-            # If no generated description, just use regular search
             search_results = self.search_similar_assessments(query_vector, params, top_k=top_k*3)
             recommendations = self.format_search_results(search_results)
             search_method = "regular"
 
         
         
-        # Rerank using LLM
         reranked_recommendations = self.rerank_with_llm(query, recommendations, params, top_k=top_k*2)
-        
-        # Apply filters based on extracted parameters
+   
         if params and params.get("skills"):
             reranked_recommendations = self.boost_specialized_matches(reranked_recommendations, params.get("skills"))
-    
-        # Apply filters based on extracted parameters
+
         if params:
             filtered_recommendations = self.filter_by_constraints(reranked_recommendations, params)
         else:
@@ -536,8 +497,7 @@ class SHLRecommendationEngine:
         else:
             # Limit to top_k
             filtered_recommendations = filtered_recommendations[:min(top_k, len(filtered_recommendations))]
-        
-        # Include metadata about the search
+    
         result = {
             "search_method": search_method,
             "recommended_assessments": filtered_recommendations
@@ -568,11 +528,9 @@ class SHLRecommendationEngine:
             return recommendations
         
         try:
-            # Get the generated description if available
             query_description = params.get("generated_description", "")
             enhanced_query = f"{query}\n\nGenerated assessment profile: {query_description}" if query_description else query
             
-            # Create a summary of each recommendation for the LLM to evaluate
             assessment_summaries = []
             for i, rec in enumerate(recommendations):
                 summary = f"Assessment #{i+1}: {rec['name']}\n"
@@ -581,11 +539,9 @@ class SHLRecommendationEngine:
                 summary += f"Duration: {rec['duration']} minutes\n"
                 summary += f"Remote support: {rec['remote_support']}\n"
                 assessment_summaries.append(summary)
-            
-            # Combine all summaries
+
             all_assessments = "\n\n".join(assessment_summaries)
             
-            # Create prompt for reranking
             prompt = f"""
             You are an assessment matching expert. Rank these assessments based on how well they match the user's needs.
     
@@ -612,50 +568,39 @@ class SHLRecommendationEngine:
             DO NOT include brackets, JSON formatting, explanations, or any other text.
             """
             
-            # Call LLM for reranking
             response = self._call_llm_api(prompt)
             logger.debug(f"Raw LLM ranking response: {response[:200]}...")
             
-            # Parse ranking from response
             ranking = self._extract_json_from_llm_response(response)
             
             if ranking and isinstance(ranking, list):
-                # If we have a nested array (first element is a list), flatten it
                 if len(ranking) > 0 and isinstance(ranking[0], list):
                     logger.info("Detected nested array in LLM response, flattening")
-                    ranking = ranking[0]  # Take the first list
-                
-                # Create a list of valid indices
+                    ranking = ranking[0] t
+
                 valid_rankings = []
                 for item in ranking:
                     try:
-                        # Convert to integer if it's a string or has # prefix
                         if isinstance(item, str):
-                            # Remove any # prefix
                             item = item.replace('#', '')
                             if item.isdigit():
                                 item = int(item)
                         
-                        # Make sure it's an integer
                         if not isinstance(item, int):
                             logger.warning(f"Skipping non-integer ranking value: {item}")
                             continue
-                        
-                        # Check if it's in range (1-based to 0-based)
-                        index = item - 1  # Convert from 1-indexed to 0-indexed
+
+                        index = item - 1  
                         if 0 <= index < len(recommendations):
                             valid_rankings.append(index)
                         else:
                             logger.warning(f"Ranking index out of range: {item}")
                     except Exception as e:
                         logger.warning(f"Error processing ranking item {item}: {str(e)}")
-                
-                # Check if we have any valid rankings
+            
                 if valid_rankings:
-                    # Create reranked list
                     reranked = [recommendations[i] for i in valid_rankings]
-                    
-                    # Add any missing recommendations at the end
+    
                     seen_indices = set(valid_rankings)
                     for i, rec in enumerate(recommendations):
                         if i not in seen_indices:
@@ -670,27 +615,22 @@ class SHLRecommendationEngine:
             
         except Exception as e:
             logger.error(f"Error in LLM reranking: {str(e)}")
-        
-        # If reranking fails, return original recommendations
+      
         return recommendations
 
     def hybrid_search(self, query, query_vector, params, top_k=30):
         """Combine multiple retrieval methods to maximize recall"""
-        results_by_url = {}  # Use URL as unique ID to avoid duplicates
+        results_by_url = {}  
         
-        # 1. Vector similarity search (semantic matching)
         vector_results = self.search_similar_assessments(query_vector, params, top_k=top_k)
         vector_recommendations = self.format_search_results(vector_results)
         
-        # Add vector results to combined results
         for rec in vector_recommendations:
             results_by_url[rec['url']] = rec
         
-        # 2. Direct skill name matching (exact matching)
         if params and params.get("skills"):
             for skill in params.get("skills"):
                 try:
-                    # Search for exact skill name in assessment name or description
                     skill_expr = f"name LIKE '%{skill}%' OR description LIKE '%{skill}%'"
                     keyword_results = self.collection.query(
                         expr=skill_expr,
@@ -698,32 +638,26 @@ class SHLRecommendationEngine:
                                       "remote_support", "adaptive_support", "test_type_json"],
                         limit=top_k
                     )
-                    
-                    # Format and add keyword results
+      
                     for hit in keyword_results:
                         rec = {field: getattr(hit, field, "") for field in 
                               ["name", "url", "description", "duration", 
                                "remote_support", "adaptive_support"]}
-                        
-                        # Parse test type JSON
+          
                         test_type_json = getattr(hit, "test_type_json", "[]")
                         rec["test_type"] = json.loads(test_type_json)
                         
-                        # Add to combined results if not already present
                         if rec['url'] not in results_by_url:
                             results_by_url[rec['url']] = rec
                 except Exception as e:
                     logger.error(f"Keyword search error for skill '{skill}': {e}")
-        
-        # 3. Test type matching (role-based matching)
+ 
         if params and params.get("test_types"):
             try:
-                # Create expression to match any test type
                 test_types = params.get("test_types")
                 test_type_conditions = []
                 
                 for test_type in test_types:
-                    # Carefully escape the test type for the query
                     safe_test_type = test_type.replace("'", "''")
                     test_type_conditions.append(f"test_type_json LIKE '%{safe_test_type}%'")
                 
@@ -735,27 +669,22 @@ class SHLRecommendationEngine:
                                       "remote_support", "adaptive_support", "test_type_json"],
                         limit=top_k
                     )
-                    
-                    # Format and add test type results
+
                     for hit in test_type_results:
                         rec = {field: getattr(hit, field, "") for field in 
                               ["name", "url", "description", "duration", 
                                "remote_support", "adaptive_support"]}
-                        
-                        # Parse test type JSON
+
                         test_type_json = getattr(hit, "test_type_json", "[]")
                         rec["test_type"] = json.loads(test_type_json)
                         
-                        # Add to combined results if not already present
                         if rec['url'] not in results_by_url:
                             results_by_url[rec['url']] = rec
             except Exception as e:
                 logger.error(f"Test type search error: {e}")
-        
-        # 4. Job title/role matching
+     
         if params and params.get("job_title"):
             try:
-                # Search for assessments matching job title
                 job_title = params.get("job_title").replace("'", "''")
                 job_expr = f"name LIKE '%{job_title}%' OR description LIKE '%{job_title}%'"
                 job_results = self.collection.query(
@@ -764,31 +693,26 @@ class SHLRecommendationEngine:
                                   "remote_support", "adaptive_support", "test_type_json"],
                     limit=top_k
                 )
-                
-                # Format and add job title results
+     
                 for hit in job_results:
                     rec = {field: getattr(hit, field, "") for field in 
                           ["name", "url", "description", "duration", 
                            "remote_support", "adaptive_support"]}
-                    
-                    # Parse test type JSON
+              
                     test_type_json = getattr(hit, "test_type_json", "[]")
                     rec["test_type"] = json.loads(test_type_json)
-                    
-                    # Add to combined results if not already present
+       
                     if rec['url'] not in results_by_url:
                         results_by_url[rec['url']] = rec
             except Exception as e:
                 logger.error(f"Job title search error: {e}")
         
-        # Combine all results
         combined_results = list(results_by_url.values())
         
-        # Log statistics
         logger.info(f"Hybrid search retrieved {len(combined_results)} unique results")
         
         return combined_results
-    # Add this after reranking but before filtering
+    
     def boost_specialized_matches(self, recommendations, query_skills):
         """Enhanced boosting with primary and secondary skill matches"""
         primary_matches = []
@@ -798,18 +722,15 @@ class SHLRecommendationEngine:
         for rec in recommendations:
             desc_lower = rec['description'].lower()
             name_lower = rec['name'].lower()
-            
-            # Calculate skill match score
+         
             skill_match_score = 0
             matched_skills = set()
             
             for skill in query_skills:
                 skill_lower = skill.lower()
-                # Name match is strongest signal
                 if skill_lower in name_lower:
                     skill_match_score += 3
                     matched_skills.add(skill)
-                # Description match is secondary signal
                 elif skill_lower in desc_lower:
                     skill_match_score += 1
                     matched_skills.add(skill)
@@ -849,25 +770,19 @@ class SHLRecommendationEngine:
         all_recommended_items = []
         all_relevant_items = []
         
-        # Process each test query
         for query in test_queries:
-            # Get recommendations
             recommendations = self.recommend(query, top_k=max(k_values))
             
-            # Extract IDs of recommended assessments (using URL as identifier)
             recommended_ids = [
                 rec.get("url", "")
                 for rec in recommendations.get("recommended_assessments", [])
             ]
             
-            # Get relevant items for this query
             relevant_ids = ground_truth.get(query, [])
             
-            # Store for calculating aggregate metrics
             all_recommended_items.append(recommended_ids)
             all_relevant_items.append(relevant_ids)
         
-        # Calculate metrics for each k value
         metrics = EvaluationMetrics()
         for k in k_values:
             results[f"mean_recall@{k}"] = metrics.mean_recall_at_k(
