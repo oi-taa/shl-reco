@@ -17,8 +17,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 class SHLRecommendationEngine:
-    def __init__(self, collection_name="shl_assessments", model_name="
-paraphrase-MiniLM-L3-v2", 
+    def __init__(self, collection_name="shl_assessments", model_name="paraphrase-MiniLM-L3-v2", 
              host="localhost", port="19530", llm_api_key=None, llm_model="gemini-pro",
              zilliz_uri=None, zilliz_user=None, zilliz_password=None, zilliz_secure=True):
         """
