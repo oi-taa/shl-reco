@@ -40,7 +40,7 @@ grpcio
 h11
 httpcore
 httpx
-huggingface-hub
+huggingface_hub[hf_xet]
 idna
 Jinja2
 joblib
